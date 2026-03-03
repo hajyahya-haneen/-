@@ -120,13 +120,31 @@
 
   <script>
     const TOTAL_PAGES = 24;
+<script>
 
-    // ✅ ترتيب طبيعي 1..24
-    // وبسبب قلب الاتجاه بالـ CSS سيصبح:
-    // اليمين = 2,4,6..22 واليسار = 3,5,7..23 تلقائيًا
-    const pages = [];
-    for (let i = 1; i <= TOTAL_PAGES; i++){
-      pages.push(`${i}.jpg`);
+const rightPages = [2,4,6,8,10,12,14,16,18,20,22];
+const leftPages  = [3,5,7,9,11,13,15,17,19,21,23];
+
+const pages = [];
+
+// دمج الصفحات بحيث:
+// يمين ثم يسار ثم يمين ثم يسار
+
+for (let i = 0; i < rightPages.length; i++) {
+
+  // صفحة اليمين
+  pages.push(`${rightPages[i]}.jpg`);
+
+  // صفحة اليسار
+  if (leftPages[i]) {
+    pages.push(`${leftPages[i]}.jpg`);
+  }
+
+}
+
+console.log(pages);
+
+</script>
     }
 
     const bookEl = document.getElementById("book");
