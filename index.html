@@ -3,60 +3,45 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Arabic Flipbook (RTL)</title>
+  <title>Flipbook</title>
 
   <style>
     *{ box-sizing:border-box; }
 
-    html, body{
-      width:100%;
-      height:100%;
+    body{
       margin:0;
-      overflow:hidden;
       background:#f2f2f2;
       font-family: Arial, sans-serif;
-    }
-
-    /* مساحة العرض */
-    #stage{
-      position:fixed;
-      inset:0;
       display:flex;
+      flex-direction:column;
       align-items:center;
       justify-content:center;
+      min-height:100vh;
+      gap:10px;
       padding:10px;
+      /* يساعد اللمس داخل منطقة الكتاب */
+      touch-action: pan-y;
+      -webkit-tap-highlight-color: transparent;
     }
 
     /* الكتاب */
-    #flipbook{
-      box-shadow: 0 18px 55px rgba(0,0,0,.18);
-      background:#fff;
+    #book-wrap{
+      width: min(1200px, 98vw);
+      /* ارتفاع مناسب للهاتف */
+      height: min(82vh, 760px);
+      background:transparent;
     }
 
-    /* صفحة */
-    .page{
-      background:#fff;
-    }
-
-    .page img{
+    #book{
       width:100%;
       height:100%;
-      object-fit:cover;
-      display:block;
-      user-select:none;
-      -webkit-user-drag:none;
-      pointer-events:none; /* خلي اللمس على الصفحة نفسها */
     }
 
-    /* أزرار */
     .btns{
-      position:fixed;
-      left:50%;
-      bottom:12px;
-      transform:translateX(-50%);
       display:flex;
-      gap:10px;
-      z-index:10;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:center;
     }
 
     button{
@@ -65,28 +50,33 @@
       border-radius:10px;
       cursor:pointer;
       box-shadow:0 6px 18px rgba(0,0,0,.12);
-      background:#ffffff;
+      background:#fff;
       font-size:14px;
     }
 
-    /* نجبر Landscape على الهاتف: إذا الهاتف Portrait ندوّر المسرح 90° */
-    body.portrait #stage{
-      transform: rotate(90deg);
-      transform-origin: center center;
+    .hint{
+      color:#333;
+      font-size:13px;
+      text-align:center;
+      line-height:1.5;
+      max-width: 900px;
+      opacity:.9;
     }
 
-    /* لأننا دوّرنا المسرح، نحتاج ننقل الأزرار لتظل تحت */
-    body.portrait .btns{
-      transform: translateX(-50%) rotate(90deg);
-      transform-origin: center center;
-      bottom: 18px;
+    /* تحسين العرض في Landscape على الهاتف */
+    @media (max-width: 900px) and (orientation: landscape){
+      #book-wrap{
+        width: min(1300px, 99vw);
+        height: min(90vh, 900px);
+      }
+      button{ padding:10px 16px; }
     }
   </style>
 </head>
 
 <body>
-  <div id="stage">
-    <div id="flipbook"></div>
+  <div id="book-wrap">
+    <div id="book"></div>
   </div>
 
   <div class="btns">
@@ -94,101 +84,88 @@
     <button id="next">التالي</button>
   </div>
 
-  <!-- ملفاتك المحلية -->
-  <script src="./jquery.min.js"></script>
-  <script src="./turn.min.js"></script>
+  <div class="hint">
+    على الهاتف: اسحبي من طرف الصفحة للتقليب. في وضع Landscape سيكبر الكتاب ويصير التنقل أسهل.
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.min.js"></script>
 
   <script>
     const TOTAL_PAGES = 24;
 
-    // بناء الصفحات (1.jpg ... 24.jpg)
-    const flipbookEl = document.getElementById('flipbook');
-    flipbookEl.innerHTML = "";
+    // ترتيب الصور + تبديل اليمين/اليسار داخل كل زوج (مثل ما اتفقنا)
+    const pages = [];
+    pages.push(`1.jpg`); // الغلاف الأمامي
 
-    for(let i=1; i<=TOTAL_PAGES; i++){
-      const page = document.createElement('div');
-      page.className = 'page';
-      // اجعل الغلافين "hard" (Turn.js يعتبرها أفضل كغلاف)
-      if(i === 1 || i === TOTAL_PAGES) page.classList.add('hard');
-
-      const img = document.createElement('img');
-      img.src = `${i}.jpg`;
-      img.alt = `Page ${i}`;
-
-      page.appendChild(img);
-      flipbookEl.appendChild(page);
+    for (let i = 2; i <= TOTAL_PAGES - 1; i += 2) {
+      pages.push(`${i + 1}.jpg`);
+      pages.push(`${i}.jpg`);
     }
 
-    function setPortraitClass(){
-      const portrait = window.innerHeight > window.innerWidth;
-      document.body.classList.toggle('portrait', portrait);
-    }
+    pages.push(`${TOTAL_PAGES}.jpg`); // الغلاف الخلفي
 
-    function getBookSize(){
-      // نريد دائماً صفحتين (double) وبشكل مقروء
-      // نحدد قياس "الكتاب" حسب وضع الشاشة الحقيقي
-      const portrait = window.innerHeight > window.innerWidth;
+    const bookEl = document.getElementById('book');
 
-      // إذا Portrait، نحن سندور المسرح، لذا نعامل الأبعاد وكأنها متبدلة
-      const W = portrait ? window.innerHeight : window.innerWidth;
-      const H = portrait ? window.innerWidth  : window.innerHeight;
+    let pageFlip = null;
 
-      // book بنسبة 2:1 تقريبًا (صفحتين متقابلتين)
-      const maxW = Math.min(1200, Math.floor(W * 0.95));
-      const maxH = Math.floor(H * 0.88);
+    const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
+    const isLandscape = () => window.matchMedia("(orientation: landscape)").matches;
 
-      // نحافظ على نسبة 2:1 تقريبًا
-      let bookW = maxW;
-      let bookH = Math.floor(bookW / 2);
-
-      if(bookH > maxH){
-        bookH = maxH;
-        bookW = Math.floor(bookH * 2);
+    function initFlipbook(){
+      if (pageFlip) {
+        pageFlip.destroy();
+        pageFlip = null;
       }
 
-      return { width: bookW, height: bookH };
-    }
+      // إعدادات محسنة للهاتف + Landscape
+      const mobile = isMobile();
+      const landscape = isLandscape();
 
-    function initOrResize(){
-      setPortraitClass();
+      pageFlip = new St.PageFlip(bookEl, {
+        // “مقاس الصفحة الواحدة” (مبدئي) — المكتبة ستمدده عبر size:stretch
+        width: 700,
+        height: 700,
 
-      const { width, height } = getBookSize();
+        size: "stretch",
+        minWidth: mobile ? 280 : 315,
+        maxWidth: 1600,
+        minHeight: mobile ? 320 : 315,
+        maxHeight: 1600,
 
-      // إذا تم تهيئة turn من قبل، فقط نعمل resize
-      if ($(flipbookEl).data('turn')) {
-        $('#flipbook').turn('size', width, height);
-        return;
-      }
+        showCover: true,
 
-      // تهيئة الكتاب
-      $('#flipbook').turn({
-        width,
-        height,
-        autoCenter: true,
-        display: 'double',       // دائماً صفحتين
-        direction: 'rtl',        // مهم: تقليب عربي (من اليسار لليمين)
-        gradients: true,
-        acceleration: true,
-        elevation: 50
+        // لمس/سحب
+        mobileScrollSupport: true,
+        useMouseEvents: true,
+
+        // على الهاتف نجعل السحب أسهل
+        swipeDistance: mobile ? 8 : 30,
+
+        // أسرع قليلًا على الهاتف
+        flippingTime: mobile ? 520 : 700,
+
+        // ظل واقعي
+        maxShadowOpacity: 0.35,
+
+        disableFlipByClick: false
       });
+
+      pageFlip.loadFromImages(pages);
+
+      // ملاحظة: لا نُجبر “صفحتين دائمًا” على الهاتف لأن المكتبة تختار الأفضل حسب العرض،
+      // لكن في Landscape ومع المساحة الأكبر غالبًا ستظهر صفحتين بشكل مريح.
     }
 
-    // تشغيل
-    initOrResize();
+    initFlipbook();
 
-    // أزرار
-    document.getElementById('next').addEventListener('click', () => {
-      $('#flipbook').turn('next'); // في RTL هذا يذهب "للأمام" باتجاه اليمين
-    });
-    document.getElementById('prev').addEventListener('click', () => {
-      $('#flipbook').turn('previous');
-    });
+    document.getElementById('next').addEventListener('click', () => pageFlip.flipNext());
+    document.getElementById('prev').addEventListener('click', () => pageFlip.flipPrev());
 
-    // إعادة ضبط عند تدوير الشاشة/تغيير الحجم
-    let t = null;
+    // إعادة تهيئة بعد تدوير الهاتف/تغيير الحجم لضبط القياسات والوضوح
+    let resizeTimer = null;
     window.addEventListener('resize', () => {
-      clearTimeout(t);
-      t = setTimeout(() => initOrResize(), 200);
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => initFlipbook(), 250);
     });
   </script>
 </body>
