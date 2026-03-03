@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flipbook</title>
+
+  <style>
+    body{
+      margin:0;
+      background:#f2f2f2;
+      font-family: Arial, sans-serif;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+      gap:12px;
+    }
+
+    #book-wrap{
+      width:min(1200px, 95vw);
+      aspect-ratio: 2 / 1;
+      background:transparent;
+    }
+
+    #book{
+      width:100%;
+      height:100%;
+    }
+
+    .hint{
+      color:#333;
+      font-size:14px;
+    }
+
+    .btns{
+      display:flex;
+      gap:8px;
+    }
+
+    button{
+      padding:10px 14px;
+      border:0;
+      border-radius:10px;
+      cursor:pointer;
+      box-shadow:0 6px 18px rgba(0,0,0,.12);
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="book-wrap">
+  <div id="book"></div>
+</div>
+
+<div class="btns">
+  <button id="prev">السابق</button>
+  <button id="next">التالي</button>
+</div>
+
+<div class="hint">يمكنك التقليب بالسحب أو النقر على أطراف الصفحة.</div>
+
+<script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.min.js"></script>
+
+<script>
+
+const TOTAL_PAGES = 24;
+
+const pages = [];
+
+// هنا التعديل: فقط الرقم بدون كلمة page
+for (let i = 1; i <= TOTAL_PAGES; i++) {
+  pages.push(`pages/${i}.jpg`);
+}
+
+const bookEl = document.getElementById('book');
+
+const pageFlip = new St.PageFlip(bookEl, {
+  width: 600,
+  height: 600,
+  size: "stretch",
+  minWidth: 315,
+  maxWidth: 1200,
+  minHeight: 315,
+  maxHeight: 1200,
+  showCover: true,
+  mobileScrollSupport: true,
+  useMouseEvents: true,
+  swipeDistance: 30,
+  flippingTime: 700,
+  disableFlipByClick: false,
+  maxShadowOpacity: 0.35
+});
+
+pageFlip.loadFromImages(pages);
+
+document.getElementById('next').addEventListener('click', () => pageFlip.flipNext());
+document.getElementById('prev').addEventListener('click', () => pageFlip.flipPrev());
+
+</script>
+
+</body>
+</html>
