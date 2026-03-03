@@ -36,7 +36,6 @@
       position:relative;
     }
 
-    /* يكبر بالـ Landscape */
     @media (max-width: 900px) and (orientation: landscape){
       #book-wrap{
         width: min(1400px, 99vw);
@@ -44,10 +43,7 @@
       }
     }
 
-    #book{
-      width:100%;
-      height:100%;
-    }
+    #book{ width:100%; height:100%; }
 
     .btns{
       display:flex;
@@ -105,7 +101,7 @@
   </div>
 
   <div class="hint">
-    على الهاتف: اسحبي من طرف الصفحة للتقليب. (الكتاب يعرض صفحتين دائمًا، ويكبر أكثر عند وضع Landscape)
+    على الهاتف: اسحبي من طرف الصفحة للتقليب. (صفحتين دائمًا + حجم ممتاز لصور 8×8)
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.min.js"></script>
@@ -113,16 +109,14 @@
   <script>
     const TOTAL_PAGES = 24;
 
-    // ✅ ترتيب الصور مع تبديل داخل كل زوج (الكتابة يمين / الصورة يسار)
+    // ✅ ترتيب الصفحات مع تبديل داخل كل زوج:
+    // (1,2) تصبح (2 يسار, 1 يمين) ... وهكذا
+    // الهدف: الكتابة يمين والصورة يسار (حسب ترتيب صورك)
     const pages = [];
-    pages.push(`1.jpg`); // غلاف أمامي
-
-    for (let i = 2; i <= TOTAL_PAGES - 1; i += 2) {
+    for (let i = 1; i <= TOTAL_PAGES; i += 2) {
       pages.push(`${i + 1}.jpg`);
       pages.push(`${i}.jpg`);
     }
-
-    pages.push(`${TOTAL_PAGES}.jpg`); // غلاف خلفي
 
     const bookEl = document.getElementById('book');
     const wrapEl = document.getElementById('book-wrap');
@@ -137,7 +131,6 @@
       loadingEl.classList.toggle('show', !!on);
     }
 
-    // Preload مرة واحدة لمنع صفحات بيضاء/اختفاء بعد الدوران
     function preloadImages(urls){
       if (imagesReady) return Promise.resolve();
       showLoading(true);
@@ -155,72 +148,53 @@
       });
     }
 
-    // حساب مقاس "الصفحة الواحدة" بحيث:
-    // - دائمًا صفحتين جنب بعض داخل الحاوية
-    // - مناسب لصور طولية
-    function computePageSize(){
+    // صورك مربعة 8×8 => نسبة 1:1
+    function computeSquarePageSize(){
       const W = Math.max(320, wrapEl.clientWidth);
       const H = Math.max(320, wrapEl.clientHeight);
 
-      // نسبة الصفحة (عرض/ارتفاع) لصور طولية — عدّليها إذا صورك أضيق/أعرض
-      // 0.70 ممتاز لصفحات 4:5 تقريبًا
-      const PAGE_RATIO = 0.70;
+      // نريد صفحتين داخل العرض: 2*page <= W
+      // ونريد الصفحة مربعة: page = min(H, W/2)
+      let page = Math.floor(Math.min(H, W / 2));
 
-      let pageH = Math.floor(H);
-      let pageW = Math.floor(pageH * PAGE_RATIO);
+      // حدود أمان للهاتف
+      page = Math.max(260, page);
 
-      // لازم صفحتين يدخلوا بعرض الحاوية
-      const maxPageWByContainer = Math.floor(W / 2);
-      if (pageW > maxPageWByContainer) {
-        pageW = maxPageWByContainer;
-        pageH = Math.floor(pageW / PAGE_RATIO);
-      }
-
-      // حدود أمان
-      pageW = Math.max(260, pageW);
-      pageH = Math.max(320, pageH);
-
-      return { pageW, pageH };
+      return { pageW: page, pageH: page };
     }
 
     async function initFlipbookSafe(){
-      // احفظي الصفحة الحالية
       let currentIndex = 0;
       try { if (pageFlip) currentIndex = pageFlip.getCurrentPageIndex(); } catch(e){}
 
       showLoading(true);
-
-      // انتظري استقرار القياسات (مهم جدًا على الهاتف)
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       await preloadImages(pages);
 
-      // دمّري القديم
       if (pageFlip) {
         try { pageFlip.destroy(); } catch(e){}
         pageFlip = null;
       }
       bookEl.innerHTML = "";
 
-      const { pageW, pageH } = computePageSize();
+      const { pageW, pageH } = computeSquarePageSize();
       const mobile = isMobile();
 
       pageFlip = new St.PageFlip(bookEl, {
-        // مهم: هذه أبعاد الصفحة الواحدة (Double spread = صفحتين)
         width: pageW,
         height: pageH,
 
-        // ✅ "fixed" + usePortrait:false = صفحتين دائمًا حتى على الهاتف
+        // ✅ صفحتين دائمًا
         size: "fixed",
         usePortrait: false,
 
-        showCover: true,
+        // ✅ مهم: حتى لا يضع صفحة بيضاء بجانب الغلاف
+        showCover: false,
 
-        // لمس/سحب
         mobileScrollSupport: true,
         useMouseEvents: true,
 
-        // أسهل للموبايل
         swipeDistance: mobile ? 8 : 30,
         flippingTime: mobile ? 520 : 700,
 
@@ -230,20 +204,17 @@
 
       pageFlip.loadFromImages(pages);
 
-      // ارجعي لنفس الصفحة بعد التهيئة
+      // ارجاع نفس الصفحة بعد الدوران
       try { pageFlip.flip(currentIndex); } catch(e){}
 
       showLoading(false);
     }
 
-    // تشغيل أولي
     initFlipbookSafe();
 
-    // أزرار
     document.getElementById('next').addEventListener('click', () => pageFlip && pageFlip.flipNext());
     document.getElementById('prev').addEventListener('click', () => pageFlip && pageFlip.flipPrev());
 
-    // إعادة تهيئة آمنة عند التدوير/تغيير الحجم
     let timer = null;
     function scheduleReinit(){
       clearTimeout(timer);
