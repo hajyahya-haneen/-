@@ -19,15 +19,12 @@
       min-height:100vh;
       gap:10px;
       padding:10px;
-      /* يساعد اللمس داخل منطقة الكتاب */
       touch-action: pan-y;
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* الكتاب */
     #book-wrap{
       width: min(1200px, 98vw);
-      /* ارتفاع مناسب للهاتف */
       height: min(82vh, 760px);
       background:transparent;
     }
@@ -63,7 +60,6 @@
       opacity:.9;
     }
 
-    /* تحسين العرض في Landscape على الهاتف */
     @media (max-width: 900px) and (orientation: landscape){
       #book-wrap{
         width: min(1300px, 99vw);
@@ -93,23 +89,25 @@
   <script>
     const TOTAL_PAGES = 24;
 
-    // ترتيب الصور + تبديل اليمين/اليسار داخل كل زوج (مثل ما اتفقنا)
+    // ✅ ترتيب الصور مع تبديل اليمين/اليسار داخل كل زوج
+    // 1.jpg = الغلاف الأمامي (يبقى كما هو)
+    // 24.jpg = الغلاف الخلفي (يبقى كما هو)
     const pages = [];
+
     pages.push(`1.jpg`); // الغلاف الأمامي
 
+    // من 2 إلى 23 نقلب كل زوج: (2<->3) (4<->5) ...
     for (let i = 2; i <= TOTAL_PAGES - 1; i += 2) {
-      pages.push(`${i + 1}.jpg`);
-      pages.push(`${i}.jpg`);
+      pages.push(`${i + 1}.jpg`); // كانت يمين → تصبح يسار
+      pages.push(`${i}.jpg`);     // كانت يسار → تصبح يمين
     }
 
     pages.push(`${TOTAL_PAGES}.jpg`); // الغلاف الخلفي
 
     const bookEl = document.getElementById('book');
-
     let pageFlip = null;
 
     const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
-    const isLandscape = () => window.matchMedia("(orientation: landscape)").matches;
 
     function initFlipbook(){
       if (pageFlip) {
@@ -117,12 +115,9 @@
         pageFlip = null;
       }
 
-      // إعدادات محسنة للهاتف + Landscape
       const mobile = isMobile();
-      const landscape = isLandscape();
 
       pageFlip = new St.PageFlip(bookEl, {
-        // “مقاس الصفحة الواحدة” (مبدئي) — المكتبة ستمدده عبر size:stretch
         width: 700,
         height: 700,
 
@@ -133,27 +128,17 @@
         maxHeight: 1600,
 
         showCover: true,
-
-        // لمس/سحب
         mobileScrollSupport: true,
         useMouseEvents: true,
 
-        // على الهاتف نجعل السحب أسهل
         swipeDistance: mobile ? 8 : 30,
-
-        // أسرع قليلًا على الهاتف
         flippingTime: mobile ? 520 : 700,
 
-        // ظل واقعي
         maxShadowOpacity: 0.35,
-
         disableFlipByClick: false
       });
 
       pageFlip.loadFromImages(pages);
-
-      // ملاحظة: لا نُجبر “صفحتين دائمًا” على الهاتف لأن المكتبة تختار الأفضل حسب العرض،
-      // لكن في Landscape ومع المساحة الأكبر غالبًا ستظهر صفحتين بشكل مريح.
     }
 
     initFlipbook();
@@ -161,7 +146,6 @@
     document.getElementById('next').addEventListener('click', () => pageFlip.flipNext());
     document.getElementById('prev').addEventListener('click', () => pageFlip.flipPrev());
 
-    // إعادة تهيئة بعد تدوير الهاتف/تغيير الحجم لضبط القياسات والوضوح
     let resizeTimer = null;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimer);
