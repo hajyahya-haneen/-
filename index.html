@@ -108,9 +108,18 @@ const TOTAL_PAGES = 24;
 /* ترتيب الصور طبيعي */
 const pages = [];
 
-for (let i = 1; i <= TOTAL_PAGES; i++){
-pages.push(`${i}.jpg`);
+
+/* الغلاف الأمامي */
+pages.push(`1.jpg`);
+
+/* داخل القصة: يمين = 2,4,6..22  | يسار = 3,5,7..23  */
+for (let i = 2; i <= TOTAL_PAGES - 2; i += 2){
+  pages.push(`${i+1}.jpg`); // اليسار
+  pages.push(`${i}.jpg`);   // اليمين
 }
+
+/* الغلاف الخلفي */
+pages.push(`${TOTAL_PAGES}.jpg`);
 
 const bookEl = document.getElementById("book");
 const wrapEl = document.getElementById("book-wrap");
