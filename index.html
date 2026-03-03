@@ -8,15 +8,21 @@
   <style>
     *{ box-sizing:border-box; }
 
-    body{
+    html, body{
       margin:0;
+      padding:0;
       background:#f2f2f2;
       font-family: Arial, sans-serif;
+      /* d/s vh تمنع مشاكل اختفاء/قفز الارتفاع على الهاتف */
+      height: 100dvh;
+      min-height: 100svh;
+    }
+
+    body{
       display:flex;
       flex-direction:column;
       align-items:center;
       justify-content:center;
-      min-height:100vh;
       gap:10px;
       padding:10px;
       touch-action: pan-y;
@@ -25,8 +31,18 @@
 
     #book-wrap{
       width: min(1200px, 98vw);
-      height: min(82vh, 760px);
+      height: min(82dvh, 760px);
+      min-height: 320px;
       background:transparent;
+      position:relative;
+    }
+
+    /* أكبر في Landscape على الهاتف */
+    @media (max-width: 900px) and (orientation: landscape){
+      #book-wrap{
+        width: min(1400px, 99vw);
+        height: min(90dvh, 900px);
+      }
     }
 
     #book{
@@ -60,18 +76,28 @@
       opacity:.9;
     }
 
-    @media (max-width: 900px) and (orientation: landscape){
-      #book-wrap{
-        width: min(1300px, 99vw);
-        height: min(90vh, 900px);
-      }
-      button{ padding:10px 16px; }
+    /* طبقة تحميل بسيطة */
+    .loading{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:rgba(242,242,242,.85);
+      color:#333;
+      font-size:14px;
+      border-radius:12px;
+      z-index:5;
+      visibility:hidden;
     }
+    .loading.show{ visibility:visible; }
   </style>
 </head>
 
 <body>
+
   <div id="book-wrap">
+    <div class="loading" id="loading">جاري تحميل الصفحات…</div>
     <div id="book"></div>
   </div>
 
@@ -81,7 +107,7 @@
   </div>
 
   <div class="hint">
-    على الهاتف: اسحبي من طرف الصفحة للتقليب. في وضع Landscape سيكبر الكتاب ويصير التنقل أسهل.
+    على الهاتف: اسحبي من طرف الصفحة للتقليب.  Landscape .
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.min.js"></script>
@@ -89,45 +115,100 @@
   <script>
     const TOTAL_PAGES = 24;
 
-    // ✅ هنا التبديل الحقيقي داخل كل زوج
-    // 1 غلاف أمامي، 24 غلاف خلفي
+    // ✅ ترتيب الصور مع تبديل اليمين/اليسار داخل كل زوج (لجعل الكتابة يمين والصورة يسار)
     const pages = [];
-    pages.push(`1.jpg`);
+    pages.push(`1.jpg`); // الغلاف الأمامي
 
     for (let i = 2; i <= TOTAL_PAGES - 1; i += 2) {
-      pages.push(`${i + 1}.jpg`); // نبدّل
+      pages.push(`${i + 1}.jpg`);
       pages.push(`${i}.jpg`);
     }
 
-    pages.push(`${TOTAL_PAGES}.jpg`);
+    pages.push(`${TOTAL_PAGES}.jpg`); // الغلاف الخلفي
 
     const bookEl = document.getElementById('book');
+    const wrapEl = document.getElementById('book-wrap');
+    const loadingEl = document.getElementById('loading');
+
     let pageFlip = null;
+    let imagesReady = false;
 
     const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
 
-    function initFlipbook(){
+    function showLoading(on){
+      loadingEl.classList.toggle('show', !!on);
+    }
+
+    // تحميل الصور مسبقًا (مرّة واحدة) لتفادي فراغ/اختفاء عند الدوران
+    function preloadImages(urls){
+      if (imagesReady) return Promise.resolve();
+      showLoading(true);
+
+      const loaders = urls.map(src => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false); // حتى لو صورة ناقصة لا نعلّق
+        img.src = src;
+      }));
+
+      return Promise.all(loaders).then(() => {
+        imagesReady = true;
+        showLoading(false);
+      });
+    }
+
+    function getStableBookSize(){
+      // نعتمد على قياس الحاوية الفعلي لتفادي مشاكل الارتفاع عند الدوران
+      const w = Math.max(300, wrapEl.clientWidth);
+      const h = Math.max(320, wrapEl.clientHeight);
+
+      // صفحة واحدة baseline؛ المكتبة ستعرض سبريد حسب المساحة (showCover + stretch)
+      // نمرّر width/height كحجم "صفحة واحدة"
+      // نجعل الصفحة تقريباً مربعة/قريبة لتناسب صورك
+      const pageH = Math.floor(h);
+      const pageW = Math.floor(Math.min(w / 2, pageH)); // صفحتين جنب بعض تقريبًا
+
+      return { pageW, pageH };
+    }
+
+    async function initFlipbookSafe(){
+      // احفظ الصفحة الحالية قبل التدمير
+      let currentIndex = 0;
+      try { if (pageFlip) currentIndex = pageFlip.getCurrentPageIndex(); } catch(e){}
+
+      // انتظر استقرار القياسات (مهم جدًا على الهاتف عند الدوران)
+      showLoading(true);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      await preloadImages(pages);
+
+      // إزالة أي بقايا قديمة
       if (pageFlip) {
-        pageFlip.destroy();
+        try { pageFlip.destroy(); } catch(e){}
         pageFlip = null;
       }
+      bookEl.innerHTML = "";
 
+      // قياس مستقر
+      const { pageW, pageH } = getStableBookSize();
       const mobile = isMobile();
 
       pageFlip = new St.PageFlip(bookEl, {
-        width: 700,
-        height: 700,
+        width: pageW,
+        height: pageH,
 
         size: "stretch",
         minWidth: mobile ? 280 : 315,
-        maxWidth: 1600,
+        maxWidth: 2000,
         minHeight: mobile ? 320 : 315,
-        maxHeight: 1600,
+        maxHeight: 2000,
 
         showCover: true,
 
         mobileScrollSupport: true,
         useMouseEvents: true,
+
+        // تقليب أسهل على الهاتف
         swipeDistance: mobile ? 8 : 30,
         flippingTime: mobile ? 520 : 700,
 
@@ -136,18 +217,28 @@
       });
 
       pageFlip.loadFromImages(pages);
+
+      // ارجعي لنفس الصفحة بعد إعادة التهيئة
+      try { pageFlip.flip(currentIndex); } catch(e){}
+
+      showLoading(false);
     }
 
-    initFlipbook();
+    // تشغيل أولي
+    initFlipbookSafe();
 
-    document.getElementById('next').addEventListener('click', () => pageFlip.flipNext());
-    document.getElementById('prev').addEventListener('click', () => pageFlip.flipPrev());
+    // أزرار
+    document.getElementById('next').addEventListener('click', () => pageFlip && pageFlip.flipNext());
+    document.getElementById('prev').addEventListener('click', () => pageFlip && pageFlip.flipPrev());
 
-    let resizeTimer = null;
-    window.addEventListener('resize', () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => initFlipbook(), 250);
-    });
+    // إعادة تهيئة آمنة عند التدوير/تغيير الحجم (Debounce)
+    let timer = null;
+    function scheduleReinit(){
+      clearTimeout(timer);
+      timer = setTimeout(() => initFlipbookSafe(), 350);
+    }
+    window.addEventListener('resize', scheduleReinit);
+    window.addEventListener('orientationchange', () => setTimeout(scheduleReinit, 250));
   </script>
 </body>
 </html>
