@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="ltr">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
@@ -89,20 +89,17 @@
   <script>
     const TOTAL_PAGES = 24;
 
-    // ✅ ترتيب الصور مع تبديل اليمين/اليسار داخل كل زوج
-    // 1.jpg = الغلاف الأمامي (يبقى كما هو)
-    // 24.jpg = الغلاف الخلفي (يبقى كما هو)
+    // ✅ هنا التبديل الحقيقي داخل كل زوج
+    // 1 غلاف أمامي، 24 غلاف خلفي
     const pages = [];
+    pages.push(`1.jpg`);
 
-    pages.push(`1.jpg`); // الغلاف الأمامي
-
-    // من 2 إلى 23 نقلب كل زوج: (2<->3) (4<->5) ...
     for (let i = 2; i <= TOTAL_PAGES - 1; i += 2) {
-      pages.push(`${i + 1}.jpg`); // كانت يمين → تصبح يسار
-      pages.push(`${i}.jpg`);     // كانت يسار → تصبح يمين
+      pages.push(`${i + 1}.jpg`); // نبدّل
+      pages.push(`${i}.jpg`);
     }
 
-    pages.push(`${TOTAL_PAGES}.jpg`); // الغلاف الخلفي
+    pages.push(`${TOTAL_PAGES}.jpg`);
 
     const bookEl = document.getElementById('book');
     let pageFlip = null;
@@ -128,9 +125,9 @@
         maxHeight: 1600,
 
         showCover: true,
+
         mobileScrollSupport: true,
         useMouseEvents: true,
-
         swipeDistance: mobile ? 8 : 30,
         flippingTime: mobile ? 520 : 700,
 
