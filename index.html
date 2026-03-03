@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Flipbook</title>
 
   <style>
@@ -12,7 +12,6 @@
       margin:0;
       padding:0;
       height:100dvh;
-      min-height:100svh;
       background:#f2f2f2;
       font-family: Arial, sans-serif;
       overflow:hidden;
@@ -23,17 +22,25 @@
       flex-direction:column;
       align-items:center;
       justify-content:center;
-      gap:12px;
+      gap:10px;
       padding:10px;
       touch-action: pan-y;
       -webkit-tap-highlight-color: transparent;
     }
 
     #book-wrap{
-      width:min(1200px,95vw);
-      height:min(82dvh,760px);
+      width:min(1200px, 98vw);
+      height:min(82dvh, 760px);
       min-height:320px;
       position:relative;
+
+      /* ✅ هذا هو السر: نعكس الكتاب ليصبح التقليب عربي (من اليسار لليمين) */
+      transform: scaleX(-1);
+    }
+
+    /* ✅ نعيد الصور لطبيعتها حتى لا تنقلب الكتابة داخل الصور */
+    #book-wrap img{
+      transform: scaleX(-1);
     }
 
     #book{
@@ -44,8 +51,8 @@
     .btns{
       display:flex;
       gap:10px;
-      flex-wrap:wrap;
       justify-content:center;
+      flex-wrap:wrap;
     }
 
     button{
@@ -56,6 +63,14 @@
       box-shadow:0 6px 18px rgba(0,0,0,.12);
       background:#fff;
       font-size:14px;
+    }
+
+    .hint{
+      font-size:13px;
+      color:#333;
+      text-align:center;
+      opacity:.9;
+      line-height:1.5;
     }
 
     .loading{
@@ -70,13 +85,16 @@
       color:#333;
       visibility:hidden;
       z-index:5;
+      /* لأننا عكسنا الحاوية، نعكس طبقة اللودينغ أيضاً ثم نعيد النص */
+      transform: scaleX(-1);
     }
+    .loading span{ transform: scaleX(-1); }
     .loading.show{ visibility:visible; }
 
     @media (max-width: 900px) and (orientation: landscape){
       #book-wrap{
-        width:min(1400px,99vw);
-        height:min(90dvh,900px);
+        width:min(1400px, 99vw);
+        height:min(90dvh, 900px);
       }
     }
   </style>
@@ -85,7 +103,7 @@
 <body>
 
   <div id="book-wrap">
-    <div class="loading" id="loading">جاري تحميل الصفحات…</div>
+    <div class="loading" id="loading"><span>جاري تحميل الصفحات…</span></div>
     <div id="book"></div>
   </div>
 
@@ -94,17 +112,22 @@
     <button id="next">التالي</button>
   </div>
 
+  <div class="hint">
+    التقليب عربي: اسحبي من طرف الصفحة (اليسار) باتجاه اليمين. الغلاف 1 و 24 يظهران لوحدهما.
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.min.js"></script>
 
   <script>
     const TOTAL_PAGES = 24;
 
-    // ✅ ترتيب طبيعي 1..24 كما طلبتِ
-    // ومع dir="rtl" الهدف أن يكون:
-    // يمين: 2,4,6..22
-    // يسار: 3,5,7..23
+    // ✅ ترتيب طبيعي 1..24
+    // وبسبب قلب الاتجاه بالـ CSS سيصبح:
+    // اليمين = 2,4,6..22 واليسار = 3,5,7..23 تلقائيًا
     const pages = [];
-    for (let i = 1; i <= TOTAL_PAGES; i++) pages.push(`${i}.jpg`);
+    for (let i = 1; i <= TOTAL_PAGES; i++){
+      pages.push(`${i}.jpg`);
+    }
 
     const bookEl = document.getElementById("book");
     const wrapEl = document.getElementById("book-wrap");
@@ -119,7 +142,6 @@
       loadingEl.classList.toggle("show", !!on);
     }
 
-    // ✅ Preload مرة واحدة لتفادي اختفاء/بياض عند تدوير الهاتف
     function preloadImages(urls){
       if (imagesReady) return Promise.resolve();
       showLoading(true);
@@ -138,11 +160,11 @@
     }
 
     // ✅ صور 8×8 مربعة => صفحة 1:1
+    // نريد صفحتين جنب بعض: 2*page <= عرض الحاوية
     function computeSquarePageSize(){
       const W = Math.max(320, wrapEl.clientWidth);
       const H = Math.max(320, wrapEl.clientHeight);
 
-      // صفحتين جنب بعض: 2*page <= W و page <= H
       let page = Math.floor(Math.min(H, W / 2));
       page = Math.max(260, page);
 
@@ -150,18 +172,16 @@
     }
 
     async function initFlipbookSafe(){
-      // حفظ الصفحة الحالية
       let currentIndex = 0;
       try { if (pageFlip) currentIndex = pageFlip.getCurrentPageIndex(); } catch(e){}
 
       showLoading(true);
 
-      // انتظار استقرار قياس الشاشة بعد الدوران
+      // استقرار القياس بعد دوران الهاتف
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       await preloadImages(pages);
 
-      // تدمير القديم
       if (pageFlip) {
         try { pageFlip.destroy(); } catch(e){}
         pageFlip = null;
@@ -175,17 +195,17 @@
         width: pageW,
         height: pageH,
 
-        // ✅ صفحتين دائمًا حتى على الهاتف
+        // ✅ صفحتين دائمًا (حتى على الهاتف)
         size: "fixed",
         usePortrait: false,
 
-        // ✅ الغلاف الأول والأخير لوحدهم + ورقة بيضا مقابلة
+        // ✅ الغلاف 1 و 24 لوحدهم (ويظهر معه ورقة بيضا تلقائيًا)
         showCover: true,
 
         mobileScrollSupport: true,
         useMouseEvents: true,
 
-        // ✅ تقليب أسهل على الهاتف
+        // ✅ تقليب أسهل للهاتف
         swipeDistance: mobile ? 8 : 30,
         flippingTime: mobile ? 520 : 700,
 
@@ -195,7 +215,7 @@
 
       pageFlip.loadFromImages(pages);
 
-      // رجّع نفس الصفحة
+      // ارجاع نفس الصفحة بعد إعادة التهيئة
       try { pageFlip.flip(currentIndex); } catch(e){}
 
       showLoading(false);
@@ -203,11 +223,11 @@
 
     initFlipbookSafe();
 
-    // أزرار
-    document.getElementById("next").onclick = () => pageFlip && pageFlip.flipNext();
-    document.getElementById("prev").onclick = () => pageFlip && pageFlip.flipPrev();
+    // ✅ بسبب قلب الاتجاه بالـ CSS، أزرار next/prev قد تكون معكوسة حسب الإحساس
+    // نخلي "التالي" يذهب للأمام بالنظر العربي (تقليب من اليسار لليمين)
+    document.getElementById("next").onclick = () => pageFlip && pageFlip.flipPrev();
+    document.getElementById("prev").onclick = () => pageFlip && pageFlip.flipNext();
 
-    // إعادة تهيئة آمنة عند الدوران/تغيير الحجم
     let t = null;
     function scheduleReinit(){
       clearTimeout(t);
