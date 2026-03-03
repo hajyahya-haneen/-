@@ -7,252 +7,242 @@
 <title>Flipbook</title>
 
 <style>
+  *{ box-sizing:border-box; }
 
-*{ box-sizing:border-box; }
+  html, body{
+    margin:0;
+    padding:0;
+    height:100dvh;
+    min-height:100svh;
+    background:#f2f2f2;
+    font-family:Arial, sans-serif;
+    overflow:hidden;
+  }
 
-html, body{
-margin:0;
-padding:0;
-height:100dvh;
-background:#f2f2f2;
-font-family:Arial, sans-serif;
-overflow:hidden;
-}
+  body{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    padding:10px;
+    touch-action: pan-y;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-body{
-display:flex;
-flex-direction:column;
-align-items:center;
-justify-content:center;
-gap:12px;
-padding:10px;
-}
+  #book-wrap{
+    width:min(1200px,95vw);
+    height:min(82dvh,760px);
+    min-height:320px;
+    position:relative;
+  }
 
-#book-wrap{
-width:min(1200px,95vw);
-height:min(82dvh,760px);
-min-height:320px;
-position:relative;
-}
+  #book{
+    width:100%;
+    height:100%;
+  }
 
-#book{
-width:100%;
-height:100%;
-}
+  .btns{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
 
-.btns{
-display:flex;
-gap:10px;
-flex-wrap:wrap;
-justify-content:center;
-}
+  button{
+    padding:10px 16px;
+    border:0;
+    border-radius:12px;
+    cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,.12);
+    background:#fff;
+    font-size:14px;
+  }
 
-button{
-padding:10px 16px;
-border:0;
-border-radius:12px;
-cursor:pointer;
-box-shadow:0 6px 18px rgba(0,0,0,.12);
-background:#fff;
-font-size:14px;
-}
+  .hint{
+    font-size:13px;
+    color:#333;
+    text-align:center;
+    opacity:.9;
+    line-height:1.5;
+  }
 
-.loading{
-position:absolute;
-inset:0;
-display:flex;
-align-items:center;
-justify-content:center;
-background:rgba(242,242,242,.85);
-border-radius:12px;
-font-size:14px;
-color:#333;
-visibility:hidden;
-z-index:5;
-}
+  .loading{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(242,242,242,.85);
+    border-radius:12px;
+    font-size:14px;
+    color:#333;
+    visibility:hidden;
+    z-index:5;
+  }
+  .loading.show{ visibility:visible; }
 
-.loading.show{
-visibility:visible;
-}
+  /* ✅ على الهاتف نقلل الهوامش شوي حتى ما ينقص ارتفاع الكتاب */
+  @media (max-width: 900px){
+    body{ padding:6px; gap:8px; }
+    button{ padding:9px 14px; }
+    #book-wrap{
+      width: min(1200px, 99vw);
+      height: min(78dvh, 700px);
+      min-height: 260px;
+    }
+  }
 
-/* تكبير بالهاتف عند Landscape */
-
-@media (max-width:900px) and (orientation:landscape){
-#book-wrap{
-width:min(1400px,99vw);
-height:min(90dvh,900px);
-}
-}
-
+  @media (max-width:900px) and (orientation:landscape){
+    #book-wrap{
+      width:min(1400px,99vw);
+      height:min(88dvh,900px);
+    }
+  }
 </style>
 </head>
 
 <body>
 
 <div id="book-wrap">
-<div class="loading" id="loading">جاري تحميل الصفحات…</div>
-<div id="book"></div>
+  <div class="loading" id="loading">جاري تحميل الصفحات…</div>
+  <div id="book"></div>
 </div>
 
 <div class="btns">
-<button id="prev">السابق</button>
-<button id="next">التالي</button>
+  <button id="prev">السابق</button>
+  <button id="next">التالي</button>
+</div>
+
+<div class="hint">
+  عمودي/أفقي: صفحتين كاملتين بدون قص. يمين: 2,4,6…22 — يسار: 3,5,7…23 — الغلاف 1 و 24 لوحدهما.
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.min.js"></script>
 
 <script>
+  const TOTAL_PAGES = 24;
+
+  // ✅ ترتيب الصفحات لتحقيق: يمين=2,4.. | يسار=3,5..
+  const pages = [];
+  pages.push(`1.jpg`);
+  for (let i = 2; i <= TOTAL_PAGES - 2; i += 2) {
+    pages.push(`${i+1}.jpg`); // يسار
+    pages.push(`${i}.jpg`);   // يمين
+  }
+  pages.push(`${TOTAL_PAGES}.jpg`);
 
-const TOTAL_PAGES = 24;
+  const bookEl = document.getElementById("book");
+  const wrapEl = document.getElementById("book-wrap");
+  const loadingEl = document.getElementById("loading");
 
-/* ترتيب الصور طبيعي */
-const pages = [];
+  let pageFlip = null;
+  let imagesReady = false;
 
+  const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
 
-/* الغلاف الأمامي */
-pages.push(`1.jpg`);
+  function showLoading(on){
+    loadingEl.classList.toggle("show", !!on);
+  }
 
-/* داخل القصة: يمين = 2,4,6..22  | يسار = 3,5,7..23  */
-for (let i = 2; i <= TOTAL_PAGES - 2; i += 2){
-  pages.push(`${i+1}.jpg`); // اليسار
-  pages.push(`${i}.jpg`);   // اليمين
-}
+  // ✅ تحميل خفيف للموبايل: أول 4 ثم باقي الصفحات تدريجيًا
+  async function preloadImages(urls){
+    if (imagesReady) return;
 
-/* الغلاف الخلفي */
-pages.push(`${TOTAL_PAGES}.jpg`);
+    showLoading(true);
 
-const bookEl = document.getElementById("book");
-const wrapEl = document.getElementById("book-wrap");
-const loadingEl = document.getElementById("loading");
+    const mobile = isMobile();
+    const firstBatch = mobile ? 4 : urls.length;
+    const restBatchSize = 2;
 
-let pageFlip = null;
-let imagesReady = false;
+    const loadOne = (src) => new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = src;
+    });
 
-function showLoading(on){
-loadingEl.classList.toggle("show", !!on);
-}
+    for (let i = 0; i < Math.min(firstBatch, urls.length); i++){
+      await loadOne(urls[i]);
+    }
 
-/* تحميل الصور مسبقاً */
+    showLoading(false);
 
-function preloadImages(urls){
+    if (mobile){
+      (async () => {
+        for (let i = firstBatch; i < urls.length; i += restBatchSize){
+          const chunk = urls.slice(i, i + restBatchSize);
+          await Promise.all(chunk.map(loadOne));
+          await new Promise(r => setTimeout(r, 120));
+        }
+      })();
+    }
 
-if(imagesReady) return Promise.resolve();
+    imagesReady = true;
+  }
 
-showLoading(true);
+  // ✅ حساب صفحة مربعة 1:1 بدون قص في عمودي/أفقي
+  function computeSquarePageSize(){
+    const W = Math.max(320, wrapEl.clientWidth);
+    const H = Math.max(260, wrapEl.clientHeight);
 
-const loaders = urls.map(src => new Promise(resolve => {
+    // هامش أمان للظلال + حدود المتصفح + أزرار
+    const SAFE_PAD = isMobile() ? 26 : 18;
 
-const img = new Image();
+    const usableW = Math.max(260, W - SAFE_PAD);
+    const usableH = Math.max(260, H - SAFE_PAD);
 
-img.onload = () => resolve(true);
-img.onerror = () => resolve(false);
+    // لازم صفحتين يدخلوا بالعرض: 2*page <= usableW
+    // ولازم يدخلوا بالارتفاع: page <= usableH
+    let page = Math.floor(Math.min(usableH, usableW / 2));
 
-img.src = src;
+    // حد أدنى/أقصى عملي
+    page = Math.max(220, page);
 
-}));
+    return { pageW: page, pageH: page };
+  }
 
-return Promise.all(loaders).then(()=>{
+  async function initFlipbook(){
+    let currentIndex = 0;
+    try { if (pageFlip) currentIndex = pageFlip.getCurrentPageIndex(); } catch(e){}
 
-imagesReady = true;
+    showLoading(true);
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-showLoading(false);
+    await preloadImages(pages);
 
-});
+    if (pageFlip) {
+      try { pageFlip.destroy(); } catch(e){}
+      pageFlip = null;
+    }
+    bookEl.innerHTML = "";
 
-}
+    const { pageW, pageH } = computeSquarePageSize();
+    const mobile = isMobile();
 
-/* لأن الصور مربعة */
+    pageFlip = new St.PageFlip(bookEl, {
+      width: pageW,
+      height: pageH,
 
-function computeSquarePageSize(){
+      // ✅ صفحتين دائمًا
+      size: "fixed",
+      usePortrait: false,
 
-const W = Math.max(320, wrapEl.clientWidth);
-const H = Math.max(320, wrapEl.clientHeight);
+      // ✅ الغلاف لوحده
+      showCover: true,
 
-let page = Math.floor(Math.min(H, W / 2));
+      mobileScrollSupport: true,
+      useMouseEvents: true,
 
-page = Math.max(260, page);
+      swipeDistance: mobile ? 10 : 30,
+      flippingTime: mobile ? 520 : 700,
 
-return {pageW:page,pageH:page};
+      maxShadowOpacity: 0.35,
+      disableFlipByClick: false
+    });
 
-}
+    pageFlip.loadFromImages(pages);
 
-async function initFlipbook(){
+    try { pageFlip.flip(currentIndex); } catch(e){}
 
-let currentIndex = 0;
-
-try{
-if(pageFlip) currentIndex = pageFlip.getCurrentPageIndex();
-}catch(e){}
-
-showLoading(true);
-
-await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-
-await preloadImages(pages);
-
-if(pageFlip){
-try{pageFlip.destroy()}catch(e){}
-}
-
-bookEl.innerHTML = "";
-
-const {pageW,pageH} = computeSquarePageSize();
-
-pageFlip = new St.PageFlip(bookEl,{
-
-width:pageW,
-height:pageH,
-
-size:"fixed",
-usePortrait:false,
-
-/* الغلاف الأمامي والخلفي لوحدهما */
-
-showCover:true,
-
-mobileScrollSupport:true,
-useMouseEvents:true,
-
-swipeDistance:20,
-flippingTime:650,
-
-maxShadowOpacity:0.35
-
-});
-
-pageFlip.loadFromImages(pages);
-
-try{
-pageFlip.flip(currentIndex);
-}catch(e){}
-
-showLoading(false);
-
-}
-
-initFlipbook();
-
-/* الأزرار */
-
-document.getElementById("next").onclick=()=>pageFlip.flipNext();
-document.getElementById("prev").onclick=()=>pageFlip.flipPrev();
-
-/* إعادة التهيئة عند تغيير حجم الشاشة */
-
-let t=null;
-
-function scheduleReinit(){
-
-clearTimeout(t);
-
-t=setTimeout(()=>initFlipbook(),350);
-
-}
-
-window.addEventListener("resize",scheduleReinit);
-window.addEventListener("orientationchange",()=>setTimeout(scheduleReinit,250));
-
-</script>
-
-</body>
-</html>
+    showLoading(false);
